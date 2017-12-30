@@ -11,9 +11,10 @@ import math
 ONE_MPH = 0.44704
 CREEP_VELOCITY = 1.5
 CREEP_RANGE = 30
+MIN_DISTANCE = 40  
 
-# Target velocity in meters per second.
-TARGET_VELOCITY = ONE_MPH * 24.0
+# Back down on the max velocity to ensure we do not exceed
+VELOCITY_MARGIN = 0.965
 
 '''This node will publish waypoints from the car's current position
 to some `x` distance ahead.
@@ -35,15 +36,15 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 
 # If it is not the highway, then it is the churchlot.  Highway is the
 # default
-HIGHWAY = True
+# HIGHWAY = False
 
-if HIGHWAY:
-    LOOKAHEAD_WPS = 200  # Number of waypoints we will publish. You can change this number
-    BRAKING_RANGE = 14.0 # This is in meters
-else:
-    # My version of churchlot has only 55 way points
-    LOOKAHEAD_WPS = 30 # Number of waypoints we will publish. You can change this number
-    BRAKING_RANGE = 15.0 # This _must_ be smaller than lookahead
+# if HIGHWAY:
+#     LOOKAHEAD_WPS = 200  # Number of waypoints we will publish. You can change this number
+#     BRAKING_RANGE = 14.0 # This is in meters
+# else:
+#     # My version of churchlot has only 55 way points
+#     LOOKAHEAD_WPS = 30 # Number of waypoints we will publish. You can change this number
+#     BRAKING_RANGE = 15.0 # This _must_ be smaller than lookahead
 
 
 class WaypointUpdater(object):
@@ -57,13 +58,20 @@ class WaypointUpdater(object):
         self.sin_rotate = 0.0
         self.phi = []
         self.current_velocity = 0.0
-        self.red_light = Int32(-1)
+        self.red_light = -1
         self.lap_count = 0
         self.lap_toggle = False
-        
+        self.idx = -1
+        self.end_idx = -1
+        self.dtraveled = 0.0
+
+        # the param is in km per hour. Dividing by 3.6 give mps
         max_velocity = float(rospy.get_param("/waypoint_loader/velocity")) / 3.6
-        self.target_velocity = min(TARGET_VELOCITY, max_velocity)
+        self.target_velocity = max_velocity * VELOCITY_MARGIN
         rospy.loginfo("target velocity %f" % self.target_velocity)
+
+        self.lookahead_wps = rospy.get_param("/waypoint_loader/num_wps")
+        self.braking_range = float(rospy.get_param("/waypoint_loader/brake_range"))
         
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -73,12 +81,14 @@ class WaypointUpdater(object):
         # There is no topic (yet) for /obstacle_waypoint
         #rospy.Subscriber('/obstacle_waypoint', ???, self.obstacle_cb)
 
-        self.cte_publisher = rospy.Publisher('cross_track_error', Float64, queue_size=1)
+        # cross_track_error topic... disabling for now
+        #self.cte_publisher = rospy.Publisher('cross_track_error', Float64, queue_size=1)
+        
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
         rospy.spin()
 
     def lap(self, rho):
-        # Ugly but robust
+        # Ugly but reasonably robust
         if rho < 0.2 and self.lap_toggle:
             self.lap_count += 1
             rospy.logwarn("Completed lap %d" % self.lap_count)
@@ -120,7 +130,7 @@ class WaypointUpdater(object):
         y2 = self.waypoints[idx-1].pose.pose.position.y
         cte = -((x2 - x1)*(y1 - y0) - (x1 - x0)*(y2 - y1)) /   \
                  math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
-        self.cte_publisher.publish(Float64(cte))
+        #self.cte_publisher.publish(Float64(cte))
         return cte
 
     def pose_cb(self, msg):
@@ -129,7 +139,15 @@ class WaypointUpdater(object):
             return None
 
         idx = self.get_index(msg.pose.position.x, msg.pose.position.y)
-        cte = self.get_cte(idx, msg.pose.position.x, msg.pose.position.y)
+        if idx != self.idx:
+            self.dtraveled += self.distance(self.waypoints, self.idx, idx)
+            self.idx = idx
+            
+        # For now, do not calculate or publish the cte because the other
+        # methods for generating steering angles seem to be better than
+        # a PID controller
+        #cte = self.get_cte(idx, msg.pose.position.x, msg.pose.position.y)
+        
         #rospy.logwarn("position: %d   cte: %f  stop_line %d" % \
         #              (idx, cte, self.red_light.data))
         self.publish(idx)
@@ -160,17 +178,19 @@ class WaypointUpdater(object):
                 
         #self.waypoints.extend(wp)
         self.waypoints = wp
+        self.end_idx = len(wp)
+        
         # make wrap around easier by extending waypoints
-        self.waypoints.extend(wp[0:LOOKAHEAD_WPS])
+        # (I guess this is overkill since we are supposed to stop at last wp)
+        self.waypoints.extend(wp[0:self.lookahead_wps])
 
     def current_velocity_cb(self, msg):
         self.current_velocity = msg.twist.linear.x
         return
 
     def traffic_cb(self, msg):
-        self.red_light = msg
-        a = msg.data
-        outstr = "Red light msg : " + str(a)
+        self.red_light = msg.data
+        outstr = "Red light msg : " + str(self.red_light)
         rospy.loginfo(outstr)
         return
     
@@ -184,7 +204,10 @@ class WaypointUpdater(object):
     def set_waypoint_velocity(self, waypoints, waypoint, velocity):
         if not (0 <= waypoint <= len(waypoints)):
             rospy.logwarn("WTF: %d %d" % (waypoint, len(waypoints)))
-        waypoints[waypoint].twist.twist.linear.x = velocity
+        try:
+            waypoints[waypoint].twist.twist.linear.x = velocity
+        except IndexError:
+            rospy.logwarn("Exception: %d %d" % (waypoint, len(waypoints)))
 
     def distance(self, waypoints, wp1, wp2):
         dist = 0.0
@@ -203,19 +226,22 @@ class WaypointUpdater(object):
         return dist
 
     def publish(self, idx):
+        # The publish topic might start up before we have processed the waypoints
+        if idx >= len(self.waypoints):
+            return
         lane = Lane()
         lane.header.frame_id = '/world'
         lane.header.stamp = rospy.Time.now()
         lane.waypoints = []
-        lane.waypoints.extend(self.waypoints[idx:idx+LOOKAHEAD_WPS])
+        lane.waypoints.extend(self.waypoints[idx:idx+self.lookahead_wps])
         
         # it looks like we sometimes get bad red_light data
         # dist = self.red_light - idx
-        # if self.lap == 0 and self.red_light > -1 and dist < BRAKING_RANGE:
+        # if self.lap == 0 and self.red_light > -1 and dist < self.braking_range:
         #     if idx < 280 and dist < CREEP_RANGE and self.current_velocity < CREEP_VELOCITY:
         #         for i in range(CREEP_RANGE - 5):
         #             self.set_waypoint_velocity(lane.waypoints, i, CREEP_VELOCITY)
-        #         for i in range(CREEP_RANGE - 5, LOOKAHEAD_WPS):
+        #         for i in range(CREEP_RANGE - 5, self.lookahead_wps):
         #             self.set_waypoint_velocity(lane.waypoints, i, 0.0)
         #     else:                
         #         # incr = 1.1 * (self.current_velocity / max(0.1, float(dist)))
@@ -223,35 +249,35 @@ class WaypointUpdater(object):
         #         # for i in range(dist):
         #         #     self.set_waypoint_velocity(lane.waypoints, i, max(0.0, velo))
         #         #     velo -= incr
-        #         # #rospy.logwarn("%d  %d  %d  %d" % (dist, len(lane.waypoints), LOOKAHEAD_WPS))
-        #         # for i in range(dist, LOOKAHEAD_WPS):
+        #         # #rospy.logwarn("%d  %d  %d  %d" % (dist, len(lane.waypoints), self.lookahead_wps))
+        #         # for i in range(dist, self.lookahead_wps):
         #         #     self.set_waypoint_velocity(lane.waypoints, i, 0.0)
 
         #         # let's just try a hard stop
-        #         for i in range(LOOKAHEAD_WPS):
+        #         for i in range(self.lookahead_wps):
         #             self.set_waypoint_velocity(lane.waypoints, i, 0.0)
         # else:
-        #     for i in range(LOOKAHEAD_WPS):
+        #     for i in range(self.lookahead_wps):
         #         self.set_waypoint_velocity(lane.waypoints, i, self.target_velocity)
 
 
         # Dead nuts simple braking strategy.  This brakes at max value
-        dist = self.distance(self.waypoints, idx, self.red_light.data)
-        if self.red_light.data != -1 and dist < BRAKING_RANGE:
-            for i in range(LOOKAHEAD_WPS):
+        dist = self.distance(self.waypoints, idx, self.red_light)
+        if self.red_light != -1 and dist < self.braking_range:
+            for i in range(self.lookahead_wps):
                 self.set_waypoint_velocity(lane.waypoints, i, 0.0)
         else:
-            for i in range(LOOKAHEAD_WPS):
+            for i in range(self.lookahead_wps):
                 self.set_waypoint_velocity(lane.waypoints, i, self.target_velocity)
         
 
         # Karsten's patch
-        # if self.red_light.data != -1:
+        # if self.red_light != -1:
 
         #     rampwidth = 100
 
-        #     for i in range(LOOKAHEAD_WPS):
-        #         xd = self.red_light.data-idx-i
+        #     for i in range(self.lookahead_wps):
+        #         xd = self.red_light - idx - i
         #         if xd < 0:
         #             rampspeed = 0.0
         #         elif xd > rampwidth:
@@ -261,7 +287,7 @@ class WaypointUpdater(object):
                             
         #         self.set_waypoint_velocity(lane.waypoints, i, rampspeed )
         # else:
-        #     for i in range(LOOKAHEAD_WPS):
+        #     for i in range(self.lookahead_wps):
         #         self.set_waypoint_velocity(lane.waypoints, i, self.target_velocity)
         
         self.final_waypoints_pub.publish(lane)

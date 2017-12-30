@@ -18,8 +18,8 @@ sys.path.append(os.path.join(ROOT_PATH, 'models/research/'))
 sys.path.append(os.path.join(ROOT_PATH, 'models/research/object_detection/utils'))
 
 # import tensorflow models functions
-from label_map_util import load_labelmap, convert_label_map_to_categories, create_category_index
-from visualization_utils import visualize_boxes_and_labels_on_image_array
+#from label_map_util import load_labelmap, convert_label_map_to_categories, create_category_index
+#from visualization_utils import visualize_boxes_and_labels_on_image_array
 
 CLASS_TO_TRAFFIC_LIGHT = {
     2: TrafficLight.RED,
@@ -36,13 +36,13 @@ class TLClassifier(object):
     def __init__(self):
         #TODO load classifier
         model_path = os.path.join(MODEL_PATH, "frozen_inference_graph.pb")
-        label_path = os.path.join(MODEL_PATH, "train_data/label_map.pbtxt")
+        #label_path = os.path.join(MODEL_PATH, "train_data/label_map.pbtxt")
         NUM_CLASSES = 4
         
-        label_map = load_labelmap(label_path)
-        categories = convert_label_map_to_categories(label_map, max_num_classes=NUM_CLASSES,
-                                                                    use_display_name=True)
-        self.category_index = create_category_index(categories)
+        #label_map = load_labelmap(label_path)
+        #categories = convert_label_map_to_categories(label_map, max_num_classes=NUM_CLASSES,
+        #                                                            use_display_name=True)
+        #self.category_index = create_category_index(categories)
         
         #### Build network
         self.image_np_deep = None

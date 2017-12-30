@@ -3,5 +3,7 @@
     <node pkg="waypoint_loader" type="waypoint_loader.py" name="waypoint_loader">
         <param name="path" value="$(find styx)../../../data/wp_yaw_const.csv" />
         <param name="velocity" value="40" />
+        <param name="num_wps" value="200" />
+        <param name="brake_range" value="14" />
     </node>
 </launch>
