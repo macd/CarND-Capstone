@@ -34,6 +34,7 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 
 '''
 
+# This is all in the launch files now.  Use rospy.get_param
 # If it is not the highway, then it is the churchlot.  Highway is the
 # default
 # HIGHWAY = False
@@ -61,9 +62,7 @@ class WaypointUpdater(object):
         self.red_light = -1
         self.lap_count = 0
         self.lap_toggle = False
-        self.idx = -1
         self.end_idx = -1
-        self.dtraveled = 0.0
 
         # the param is in km per hour. Dividing by 3.6 give mps
         max_velocity = float(rospy.get_param("/waypoint_loader/velocity")) / 3.6
@@ -139,9 +138,6 @@ class WaypointUpdater(object):
             return None
 
         idx = self.get_index(msg.pose.position.x, msg.pose.position.y)
-        if idx != self.idx:
-            self.dtraveled += self.distance(self.waypoints, self.idx, idx)
-            self.idx = idx
             
         # For now, do not calculate or publish the cte because the other
         # methods for generating steering angles seem to be better than
