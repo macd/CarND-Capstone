@@ -7,13 +7,14 @@ from styx_msgs.msg import TrafficLightArray, TrafficLight
 from styx_msgs.msg import Lane
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
-from light_classification.tl_classifier import TLClassifier
+from light_classification.tl_classifier import TLClassifier, TLKeras
 import tf
 import cv2
 import yaml
 
 LOOP_ONCE = True
 USE_CLASSIFICATION = True
+USE_KERAS_MODEL = True
 STATE_COUNT_THRESHOLD = 3
 
 class TLDetector(object):
@@ -37,7 +38,12 @@ class TLDetector(object):
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
         self.bridge = CvBridge()
-        self.light_classifier = TLClassifier()
+
+        if USE_KERAS_MODEL:
+            self.light_classifier = TLKeras()
+        else:
+            self.light_classifier = TLClassifier()
+
         self.listener = tf.TransformListener()
 
         self.state = TrafficLight.UNKNOWN
@@ -220,7 +226,8 @@ class TLDetector(object):
             self.prev_light_loc = None
             return False
 
-        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+        # Changed this to rgb since that is default for tensorflow / keras
+        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "rgb8")
 
         # Get classification
         return self.light_classifier.get_classification(cv_image)

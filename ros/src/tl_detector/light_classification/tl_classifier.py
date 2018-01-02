@@ -1,16 +1,22 @@
+import keras
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.models import model_from_json, load_model
+import numpy as np
+from PIL import Image
+
 from styx_msgs.msg import TrafficLight
 import sys
 import os
 import tensorflow as tf
-import numpy as np
 import rospy
 import time
 
 import cv2
-from PIL import Image
 
 # trained model path
 MODEL_PATH = os.path.join(os.getcwd(), '../../..', 'train_classifier')
+
 
 # add tensorflow models path (https://github.com/tensorflow/models)
 ROOT_PATH = os.path.join(os.getcwd(), '../../..')
@@ -27,6 +33,7 @@ CLASS_TO_TRAFFIC_LIGHT = {
     1: TrafficLight.GREEN,
     4: TrafficLight.UNKNOWN
 }
+
 
 ##################################
 # Traffic Light Classifier Class #
@@ -96,7 +103,8 @@ class TLClassifier(object):
                     (im_height, im_width, 3)).astype(np.uint8)
 
         if run_network is True:
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            # We are now capturing in rgb
+            #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             image = Image.fromarray(image)
             image_np = load_image_into_numpy_array(image)
             image_np_expanded = np.expand_dims(image_np, axis=0)
@@ -122,3 +130,52 @@ class TLClassifier(object):
                             light = c_l
             return light
 
+
+class TLKeras(object):
+    def __init__(self):
+        # Normally, you'd think that we can just load a keras model here and
+        # use it elsewhere, but you'd be wrong when running in ROS.
+        # This is a most bizarre bug... it turns out because of the threading of 
+        # the process that runs the tl detector node, if we read in the model here
+        # and just try to use it, it will error out in the get_classification method
+        # saying that it cannot find the final softmax layer.
+        # So we have to do the extra steps below, including calling an internal
+        # method, to make it work.  See
+        # https://github.com/keras-team/keras/issues/2397#issuecomment-338659190
+        model_path = os.path.join(MODEL_PATH, "full_model.hd5")
+        self.model = load_model(model_path)
+        self.model._make_predict_function()
+        self.graph = tf.get_default_graph()
+
+    def get_classification(self, image):
+        """Determines the color of the traffic light in the image
+
+        Args:
+            image (cv::Mat): image containing the traffic light
+
+        Returns:
+            int: ID of traffic light color (specified in styx_msgs/TrafficLight)
+
+        """
+        # First resize the image to something smaller
+        x = np.array(cv2.resize(image, (400, 300), cv2.INTER_AREA), dtype=np.float64)
+        x = np.expand_dims(x, axis=0) / 255.
+        
+        # BGR 2 RGB convert
+        # We are now capturing in rgb
+        #x = x[..., ::-1]
+
+        with self.graph.as_default():
+            preds = self.model.predict(x)
+
+        min_score_thresh = 0.50
+        light = TrafficLight.UNKNOWN
+
+        for (i, prob) in enumerate(preds[0]):
+            if prob > min_score_thresh:
+                c_l = CLASS_TO_TRAFFIC_LIGHT[i+1]
+                if c_l < light:
+                    light = c_l
+        
+        return light
+        
