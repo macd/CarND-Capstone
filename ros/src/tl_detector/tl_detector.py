@@ -17,6 +17,26 @@ USE_CLASSIFICATION = True
 USE_KERAS_MODEL = True
 STATE_COUNT_THRESHOLD = 3
 
+COLLECT_IMAGES = False
+CAPTURE_DISTANCE = 200
+
+#  These points can be anywhere, but I used to collect images 
+#  around the traffic lights. For the record, the lights are
+#  located at the following indices:
+#  [293, 754, 2047, 2580, 6294, 7008, 8540, 9733]
+capture_idxs = [6294, 7008]
+
+
+# This is just used for naming the captured images of the traffic
+# lights.  This effectively labels them as well (at least for a
+# pure classification NN)
+TRAFFIC_LIGHT_2_NAME = {
+    TrafficLight.RED: "red",
+    TrafficLight.YELLOW: "yellow",
+    TrafficLight.GREEN: "green",
+    TrafficLight.UNKNOWN: "unkn"
+}
+
 class TLDetector(object):
     def __init__(self):
         rospy.init_node('tl_detector')
@@ -51,6 +71,9 @@ class TLDetector(object):
         self.last_wp = -1
         self.state_count = 0
         self.stop_idxs = []
+        
+        # For image capture...
+        self.last_capture_idx = 0
         
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -212,6 +235,21 @@ class TLDetector(object):
         """
         return self.get_index(pose.position.x, pose.position.y)
 
+
+    def save_image(self, image):
+        if not COLLECT_IMAGES:
+            return
+        sl_idx, state, light = self.get_next_stop_line()
+
+        if sl_idx in capture_idxs and \
+           sl_idx - self.pos < CAPTURE_DISTANCE and \
+           self.pos > self.last_capture_idx + 10:
+            self.last_capture_idx = self.pos
+            fname = "/sandbox/capture/" + TRAFFIC_LIGHT_2_NAME[state] + \
+                    str(sl_idx) + "_" + str(self.pos) + ".jpg"
+            cv2.imwrite(fname, image, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            
+
     def get_light_state(self, light):
         """Determines the current color of the traffic light
 
@@ -229,6 +267,9 @@ class TLDetector(object):
         # Changed this to rgb since that is default for tensorflow / keras
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "rgb8")
 
+        # only for data collecton
+        self.save_image(cv_image)
+            
         # Get classification
         return self.light_classifier.get_classification(cv_image)
 

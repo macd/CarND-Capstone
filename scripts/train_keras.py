@@ -14,10 +14,10 @@ img_width, img_height = 300, 400
 
 train_data_dir = 'data/train'
 validation_data_dir = 'data/validation'
-nb_train_samples = 794
+nb_train_samples = 832
 nb_validation_samples = 794
-epochs = 70
-batch_size = 4
+epochs = 200
+batch_size = 16
 
 
 input_shape = (img_width, img_height, 3)
