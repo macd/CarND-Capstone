@@ -85,7 +85,7 @@ class DBWNode(object):
         rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cmd_cb)
         rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb)
         rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb)
-        rospy.Subscriber('/cross_track_error', Float64, self.cross_track_cb)        
+        #rospy.Subscriber('/cross_track_error', Float64, self.cross_track_cb)        
         self.loop()
 
     def loop(self):
