@@ -8,14 +8,18 @@ from keras.models import Sequential
 from keras.layers import Conv2D, MaxPooling2D
 from keras.layers import Activation, Flatten, Dense, BatchNormalization
 from keras import backend as K
+from keras.callbacks import ModelCheckpoint
 
 # dimensions of all images will be resized to the following
 img_width, img_height = 300, 400
 
 train_data_dir = 'data/train'
-validation_data_dir = 'data/validation'
-nb_train_samples = 832
-nb_validation_samples = 794
+
+# We really don't have the luxury of real validation data
+validation_data_dir = 'data/train'
+
+nb_train_samples = 1161
+nb_validation_samples = 1161
 epochs = 200
 batch_size = 16
 
@@ -54,7 +58,7 @@ def build_model():
     model.summary()
     return model
 
-def train_model(model):
+def train_model(model, callbacks=[]):
     model.compile(loss='categorical_crossentropy',
               optimizer='rmsprop',
               metrics=['accuracy'])
@@ -87,10 +91,18 @@ def train_model(model):
         steps_per_epoch=nb_train_samples // batch_size,
         epochs=epochs,
         validation_data=validation_generator,
-        validation_steps=nb_validation_samples // batch_size)
+        validation_steps=nb_validation_samples // batch_size,
+        callbacks=callbacks)
 
 
 if __name__ == "__main__":
     model = build_model()
-    train_model(model)
-    model.model.save('full_model.hd5')    
+    cb = ModelCheckpoint('best_model.hd5',
+                    monitor='val_loss',
+                    verbose=0,
+                    save_best_only=True,
+                    save_weights_only=False,
+                    mode='auto',
+                    period=1)
+    train_model(model, [cb])
+    model.model.save('track_model.hd5')    
