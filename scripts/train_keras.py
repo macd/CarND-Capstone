@@ -18,8 +18,8 @@ train_data_dir = 'data/train'
 # We really don't have the luxury of real validation data
 validation_data_dir = 'data/train'
 
-nb_train_samples = 1161
-nb_validation_samples = 1161
+nb_train_samples = 1171
+nb_validation_samples = 1171
 epochs = 200
 batch_size = 16
 
@@ -97,7 +97,7 @@ def train_model(model, callbacks=[]):
 
 if __name__ == "__main__":
     model = build_model()
-    cb = ModelCheckpoint('best_model.hd5',
+    cb = ModelCheckpoint('model_{epoch:03d}_{val_loss:.3f}.hd5',
                     monitor='val_loss',
                     verbose=0,
                     save_best_only=True,
