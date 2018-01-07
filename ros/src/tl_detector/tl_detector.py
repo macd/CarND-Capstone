@@ -12,17 +12,20 @@ import tf
 import cv2
 import yaml
 
-LOOP_ONCE = True
+# Set LOOP_ONCE = False to loop indefinitely around the track
+LOOP_ONCE = False
 USE_CLASSIFICATION = True
 USE_KERAS_MODEL = True
 STATE_COUNT_THRESHOLD = 3
 
+# These three can be used for data capture
 COLLECT_IMAGES = False
 CAPTURE_DISTANCE = 200
+CAPTURE_DIR = "/sandbox/capture/"
 
 #  These points can be anywhere, but I used to collect images 
-#  around the traffic lights. For the record, the lights are
-#  located at the following indices:
+#  around the traffic lights. For the record, the stop lines for
+#  the lights are located at the following indices:
 #  [293, 754, 2047, 2580, 6294, 7008, 8540, 9733]
 capture_idxs = [6294, 7008]
 
@@ -219,7 +222,7 @@ class TLDetector(object):
         else:
             light_wp = self.last_wp
 
-        # Make sure we publish on every cycle
+        # We refactored Udacity's code to make sure we publish on every cycle
         self.upcoming_red_light_pub.publish(Int32(light_wp))
         self.state_count += 1
 
@@ -237,6 +240,7 @@ class TLDetector(object):
 
 
     def save_image(self, image):
+        ''' Image capture for generating training images'''
         if not COLLECT_IMAGES:
             return
         sl_idx, state, light = self.get_next_stop_line()
@@ -245,7 +249,7 @@ class TLDetector(object):
            sl_idx - self.pos < CAPTURE_DISTANCE and \
            self.pos > self.last_capture_idx + 10:
             self.last_capture_idx = self.pos
-            fname = "/sandbox/capture/" + TRAFFIC_LIGHT_2_NAME[state] + \
+            fname = CAPTURE_DIR + TRAFFIC_LIGHT_2_NAME[state] + \
                     str(sl_idx) + "_" + str(self.pos) + ".jpg"
             cv2.imwrite(fname, image, [cv2.IMWRITE_JPEG_QUALITY, 90])
             
@@ -265,6 +269,7 @@ class TLDetector(object):
             return False
 
         # Changed this to rgb since that is default for tensorflow / keras
+        # Avoids unnecessary color conversions
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "rgb8")
 
         # only for data collecton

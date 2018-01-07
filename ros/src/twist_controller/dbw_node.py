@@ -51,8 +51,7 @@ class DBWNode(object):
         self.vehicle_mass = rospy.get_param('~vehicle_mass', 1736.35)  # check
         self.fuel_capacity = rospy.get_param('~fuel_capacity', 13.5)   # check
         self.brake_deadband = rospy.get_param('~brake_deadband', .1)   # check
-        #self.decel_limit = rospy.get_param('~decel_limit', -5)         # check
-        # Go for the gusto... slam on the brakes
+
         self.decel_limit = -650.0
         self.accel_limit = rospy.get_param('~accel_limit', 1.)
         self.wheel_radius = rospy.get_param('~wheel_radius', 0.2413)   # check
@@ -80,12 +79,10 @@ class DBWNode(object):
         #       not the best practice...
         self.controller = Controller(self)
 
-        # TODONE: Subscribe to all the topics you need to
-
         rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cmd_cb)
         rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb)
         rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb)
-        #rospy.Subscriber('/cross_track_error', Float64, self.cross_track_cb)        
+        # rospy.Subscriber('/cross_track_error', Float64, self.cross_track_cb)        
         self.loop()
 
     def loop(self):

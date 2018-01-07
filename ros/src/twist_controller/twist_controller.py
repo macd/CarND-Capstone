@@ -31,28 +31,20 @@ class Controller(object):
 
 
         # Values of Kp, Ki, and Kd are from DataSpeed example
-        # This is really only a proportional filter
-        # (curiously, it looks like DS sets both min and max to 9.8
+        # This is really only a proportional filter where the
+        # output is contrained to [-1g, +1g]
         # These values are intended only for the two stage controller
         self.velo_pid = PID(2.0, 0.0, 0.0, -9.8, 9.8)
-
-        # original Karsten patch... Alternates between throttle full
-        # or full braking crashes early
-        #self.velo_pid = PID(3.0, 0.1, 0.2, -1.0, 1.0)        
-        
-        # this one modified from Karsten's patch.  Got rid of I and D
-        # speed control looks great and braking at max works too.
-        # only... steering doesn't play well with it
-        #self.velo_pid = PID(2.0, 0.0, 0.0, -1.0, 1.0)
 
         # Throttle is between 0.0 and 1.0
         # Values of Kp, Ki, and Kd are from DataSpeed example
         self.accel_pid = PID(0.4, 0.1, 0.0, 0.0, 1.0)
 
         # PID for cross track error.  Meant to replace yaw_control
-        # DOES NOT WORK WELL
+        # This did not perform well... not sure whether it was problems
+        # with the simulator or the PID parameter values.  Did not
+        # investigate deeply
         self.cte_pid = PID(0.2, 0.001, 0.85)
-        
 
     # This only does yaw control at constant throttle.  Now used
     # for debugging only
@@ -99,23 +91,7 @@ class Controller(object):
 
         accel_est = self.velo_pid.step(velo_error, CONTROL_PERIOD)
 
-        '''
-        #--------------Karsten  1-Stage Controller----------------
-
-        throttle = 0.0
-        brake = 0.0
-
-        if accel_est > 0.0:
-		throttle = accel_est
-
-	if accel_est < 0.0:
-		brake = -accel_est * 650.0
-
-	outstr = "Throttle : " + str(throttle) + " Brake : " + str(brake)
-	rospy.loginfo(outstr)
-        '''
-        
-        #---------------- DBM 2-stage controller -----------------
+        # 2-stage controller
 
         # rospy.loginfo("proposed: %f  current: %f  error: %f  accel: %f" % \
         #               (proposed_linear, current_linear, velo_error, accel_est))
@@ -129,9 +105,8 @@ class Controller(object):
             self.accel_pid.reset()
             throttle = 0.0
 
-        #if accel_est < -self.dbw_node.brake_deadband:
         if accel_est < 0.0:
-            # braking takes a positive value
+            # braking actually takes a positive value
             calc_brake = -accel_est * self.vehicle_mass * self.dbw_node.wheel_radius
             # Should move this magic number somewhere else
             brake = min(calc_brake, 650)

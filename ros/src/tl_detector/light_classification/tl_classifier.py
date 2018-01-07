@@ -23,9 +23,6 @@ ROOT_PATH = os.path.join(os.getcwd(), '../../..')
 sys.path.append(os.path.join(ROOT_PATH, 'models/research/'))
 sys.path.append(os.path.join(ROOT_PATH, 'models/research/object_detection/utils'))
 
-# import tensorflow models functions
-#from label_map_util import load_labelmap, convert_label_map_to_categories, create_category_index
-#from visualization_utils import visualize_boxes_and_labels_on_image_array
 
 CLASS_TO_TRAFFIC_LIGHT = {
     2: TrafficLight.RED,
@@ -41,15 +38,9 @@ CLASS_TO_TRAFFIC_LIGHT = {
 class TLClassifier(object):
 
     def __init__(self):
-        #TODO load classifier
+        # load classifier
         model_path = os.path.join(MODEL_PATH, "frozen_inference_graph.pb")
-        #label_path = os.path.join(MODEL_PATH, "train_data/label_map.pbtxt")
         NUM_CLASSES = 4
-        
-        #label_map = load_labelmap(label_path)
-        #categories = convert_label_map_to_categories(label_map, max_num_classes=NUM_CLASSES,
-        #                                                            use_display_name=True)
-        #self.category_index = create_category_index(categories)
         
         #### Build network
         self.image_np_deep = None
@@ -68,7 +59,7 @@ class TLClassifier(object):
 
             self.sess = tf.Session(graph=self.detection_graph, config=config)
 
-        # Definite input and output Tensors for detection_graph
+        # Define input and output Tensors for detection_graph
         self.image_tensor = self.detection_graph.get_tensor_by_name('image_tensor:0')
 
         # Each box represents a part of the image where a particular object was detected.
@@ -90,7 +81,7 @@ class TLClassifier(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-        #TODO implement light color prediction
+        # TODO implement light color prediction
         
         run_network = True
 
@@ -103,7 +94,7 @@ class TLClassifier(object):
                     (im_height, im_width, 3)).astype(np.uint8)
 
         if run_network is True:
-            # We are now capturing in rgb
+            # We are now capturing in rgb so no need to color convert
             #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             image = Image.fromarray(image)
             image_np = load_image_into_numpy_array(image)
@@ -161,10 +152,6 @@ class TLKeras(object):
         x = np.array(cv2.resize(image, (400, 300), cv2.INTER_AREA), dtype=np.float64)
         x = np.expand_dims(x, axis=0) / 255.
         
-        # BGR 2 RGB convert
-        # We are now capturing in rgb
-        #x = x[..., ::-1]
-
         with self.graph.as_default():
             preds = self.model.predict(x)
 
