@@ -20,14 +20,14 @@ STATE_COUNT_THRESHOLD = 3
 
 # These three can be used for data capture
 COLLECT_IMAGES = False
-CAPTURE_DISTANCE = 200
-CAPTURE_DIR = "/sandbox/capture/"
+CAPTURE_DISTANCE = 40
+CAPTURE_DIR = "/udacity/capture/"
 
 #  These points can be anywhere, but I used to collect images 
 #  around the traffic lights. For the record, the stop lines for
 #  the lights are located at the following indices:
 #  [293, 754, 2047, 2580, 6294, 7008, 8540, 9733]
-capture_idxs = [6294, 7008]
+capture_idxs = [6294, 7008, 9733]
 
 
 # This is just used for naming the captured images of the traffic
@@ -251,7 +251,9 @@ class TLDetector(object):
             self.last_capture_idx = self.pos
             fname = CAPTURE_DIR + TRAFFIC_LIGHT_2_NAME[state] + \
                     str(sl_idx) + "_" + str(self.pos) + ".jpg"
-            cv2.imwrite(fname, image, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            # fake out cv2 to write rgb
+            img = image[..., ::-1]
+            cv2.imwrite(fname, img, [cv2.IMWRITE_JPEG_QUALITY, 90])
             
 
     def get_light_state(self, light):
