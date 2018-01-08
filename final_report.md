@@ -30,16 +30,20 @@ Secondly
 Strictly speaking, it doesn't look like a final report is a
 requirement for the Capstone project, but if I don't write it down, it
 will be forgotten forever. (I'm sure I have forgotten much already.) I will
-not review much of the details that are outlined in the note on
-the system integration project. (Specifically the top level ROS architecture,
-the ROS topics etc) I will only touch on the high points here, but
-be aware there are many devils hiding in the details.
+not review much of the details that are outlined in the notes on
+the system integration project. But here is a top level architectural
+block diagram of the system taken from Udacity's project notes. However,
+note that the obstacle detection was not implemented and was not a part
+of the project.
+
+![top_level](imgs/cap_arch.png)
+
 
 ## Waypoint Updater
 
 The job of the waypoint updater is to first initialize the list of the waypoints
 of the track (done by the call back waypoints_cb which listens to the topic
-/base_waypoints), get the current pose (ie position)
+/base_waypoints that is published by the waypoint_loader), get the current pose (ie position)
 of the car (pose_cb listening to /current_pose), get the location of the next
 red light, if any (traffic_cb listening to /traffic_waypoint) and finally publish
 a list of upcoming waypoints and their target velocities to the topic /final_waypoints.
@@ -47,12 +51,26 @@ The drive by wire process will listen to this topic and set the throttle, steeri
 angle, and braking force accordingly.
 
 The basic insight into setting this up is that we have a very simple track
-architecture for both tracks, that is, they are roughly oval.  So angles to
-the 'center' of the track are single valued and we can use them to keep track
-of position and waypoints, kind of like a poor man's Frechet co-ordinates.
-So we find the average x, y co-ordinates of the track way points, make that the
-center, and then rotate the co-ordinates so that the first track waypoint is
-at angle zero.
+architecture for both tracks, that is, they are roughly equivalent to an oval.  
+Here is a plot of the simulation track.
+
+![sim_track](imgs/sim_track.png)
+
+and here is a plot of the test track
+
+![test_track](imgs/test_track.png)
+
+Note that the test track waypoints overlap so I edited them down removing the
+first 1 and the last four.  This allowed an unambiguous waypoint definition
+so we could run multiple laps on the test track.
+
+The angles to the 'center' of the track are single valued and we can
+use them to keep track of position and waypoints, kind of like a poor
+man's Frenet co-ordinates.  So we find the average x, y co-ordinates
+of the track way points, make that the center, and then rotate the
+co-ordinates so that the first track waypoint is at angle zero.
+This allowed us to easily find the next waypoint that was in front of 
+the vehicle's current (x, y) location.
 
 Finally, the traffic light detection code only publishes traffic light info that
 is 1) red or yellow and 2) is the next light in front of the current position of 
@@ -132,10 +150,11 @@ to do that task. This is what I have done and included in this repo.
 
 I used the first NN listed in the tutorial sited above but modified it
 in several ways.  I first added another convolutional layer followed
-by another max_pool layer to reduce the size of the output before add
-a flatten and dense layer.  The final dense layer is of size 4 (for
+by another max_pool layer to reduce the size of the output before adding
+a layer flattening and a dense layer.  The final dense layer is of size 4 (for
 the four classes).  I also removed the dropout layers, but added batch
-normalization layer after every activation layer.
+normalization layer after every activation layer, based on the observations
+of the original batch norm paper.
 
 I used this with images that were one quarter size from the simulator,
 that is, I used half size in each dimension. The resulting NN is tabulated
@@ -191,18 +210,21 @@ in the following table.
     Non-trainable params: 320
     __________________________________________
 
-I trained this NN on a data set of 830 images.  Some where from a set of ~280
-that my mentor pointed me too.  Some were from Grigory's training set.  I found
-that I had to augment slightly for traffic lights 5 and 6.  I got these images
-by instrumenting the tl_detector.py file.  It is easy to get labeled data this
-way, since we are only classifying.  We just name the images with the light state
+I trained this NN on a data set of ~1100 images.  Some where from a set of ~280
+that my mentor pointed me too.  Some were from Grigory's simulation training set.  
+Grigory also extracted images from the rosbag of the test track, which
+I also included. I found that I had to augment slightly for traffic
+lights 5, 6, and 8.  I got these images by instrumenting the
+tl_detector.py file.  It is easy to get labeled data this way, since
+we are only classifying.  We just name the images with the light state
 as returned by the simulator.
 
 The final training was done from scratch, ie no transfer learning, for 200 epochs
 with a batch size of 16.  The script to do this is in the scripts/train_keras.py
 file.
 
-The final size is only 3.3MB and performs well on the track.
+The final size is only 3.3MB and performs well on the track and classifies all
+the rosbag images correct, _but_ it is likely that it will not generalize well.
 
 ## ROS comments
 

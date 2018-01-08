@@ -13,7 +13,7 @@ import cv2
 import yaml
 
 # Set LOOP_ONCE = False to loop indefinitely around the track
-LOOP_ONCE = False
+LOOP_ONCE = True
 USE_CLASSIFICATION = True
 USE_KERAS_MODEL = True
 STATE_COUNT_THRESHOLD = 3
